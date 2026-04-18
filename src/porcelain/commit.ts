@@ -17,7 +17,8 @@ import { writeTree } from '../plumbing/write-tree';
 import { commitTree } from '../plumbing/commit-tree';
 
 export interface CommitOptions {
-  message: string;
+  message:  string;
+  amend?:   boolean;
 }
 
 export function commit(repo: Repository, opts: CommitOptions): string {
@@ -29,13 +30,41 @@ export function commit(repo: Repository, opts: CommitOptions): string {
   const treeSha = writeTree(repo);
 
   // 2. Resolve current HEAD to get parent commit(s)
-  const parentSha = repo.refs.resolveHead();
-  const parents = parentSha ? [parentSha] : [];
+  const headSha = repo.refs.resolveHead();
+
+  // ---- amend: replace the HEAD commit ------------------------------------
+  if (opts.amend) {
+    if (!headSha) throw new Error('nothing to amend — no commits yet');
+    const { CommitObjectParser } = require('../core/objects/commit');
+    const headCommit = CommitObjectParser.read(repo.store, headSha);
+
+    const { name, email } = repo.getAuthor();
+    const now = Math.floor(Date.now() / 1000);
+    const tz  = new Date().toTimeString().slice(12, 17);
+
+    const newSha = CommitObjectParser.write(repo.store, {
+      tree:      treeSha,
+      parents:   headCommit.parents,       // keep original parents
+      author:    headCommit.author,         // keep original authorship
+      committer: { name, email, timestamp: now, timezone: tz },
+      message:   opts.message || headCommit.message,
+    });
+
+    const headTarget = repo.refs.readHead();
+    if (headTarget.type === 'symref') repo.refs.updateRef(headTarget.ref, newSha);
+    else repo.refs.writeHead({ type: 'sha', hash: newSha });
+
+    const branch = repo.refs.currentBranch();
+    const label  = branch ?? `(HEAD detached at ${newSha.slice(0, 7)})`;
+    return `[${label} ${newSha.slice(0, 7)}] ${(opts.message || headCommit.message).split('\n')[0]}\n  (amend)`;
+  }
+
+  const parents = headSha ? [headSha] : [];
 
   // 3. Guard: don't commit if nothing changed vs parent tree
-  if (parentSha) {
+  if (headSha) {
     const { CommitObjectParser } = require('../core/objects/commit');
-    const parentCommit = CommitObjectParser.read(repo.store, parentSha);
+    const parentCommit = CommitObjectParser.read(repo.store, headSha);
     if (parentCommit.tree === treeSha) {
       return 'nothing to commit, working tree clean';
     }
@@ -50,7 +79,7 @@ export function commit(repo: Repository, opts: CommitOptions): string {
 
   // 5. Advance the branch ref (or write detached HEAD)
   const headTarget = repo.refs.readHead();
-  const oldHash = parentSha ?? '0'.repeat(40);
+  const oldHash = headSha ?? '0'.repeat(40);
 
   if (headTarget.type === 'symref') {
     repo.refs.updateRef(headTarget.ref, commitSha);

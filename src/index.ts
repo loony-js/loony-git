@@ -37,6 +37,9 @@ export { push }   from './porcelain/push';
 export { pull }   from './porcelain/pull';
 export { clone }  from './porcelain/clone';
 
+// Diff / merge utilities
+export { diffTrees, flattenTree, unifiedDiff, threeWayMerge } from './core/diff';
+
 // Porcelain
 export { init } from './porcelain/init';
 export { add } from './porcelain/add';
@@ -46,5 +49,8 @@ export { log, formatLog } from './porcelain/log';
 export { branch } from './porcelain/branch';
 export { checkout } from './porcelain/checkout';
 export { reset } from './porcelain/reset';
+export { show } from './porcelain/show';
+export { merge } from './porcelain/merge';
+export { stash } from './porcelain/stash';
 
 export * from './types';

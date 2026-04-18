@@ -26,6 +26,9 @@ import { fetch as gitFetch }  from '../porcelain/fetch';
 import { push  as gitPush }   from '../porcelain/push';
 import { pull  as gitPull }   from '../porcelain/pull';
 import { clone as gitClone }  from '../porcelain/clone';
+import { show  as gitShow }   from '../porcelain/show';
+import { merge as gitMerge }  from '../porcelain/merge';
+import { stash as gitStash }  from '../porcelain/stash';
 import { RemoteManager }      from '../core/remote/remote';
 import { ObjectType } from '../types';
 
@@ -49,6 +52,9 @@ Porcelain commands:
   push  [<remote>] [<refspec>] [-f]  Upload commits to remote
   pull  [<remote>] [<branch>]  fetch + fast-forward
   clone <url> [<directory>] Clone a remote repository
+  merge [--no-ff] [-m <msg>] <branch>  Merge a branch
+  stash [push|pop|list|drop|show] [-m <msg>]  Stash working changes
+  show  [--stat] [<ref>]    Show a commit with its diff
 
 Plumbing commands:
   hash-object [-w] [-t <type>] <file>
@@ -118,10 +124,11 @@ try {
 
     // ── commit ────────────────────────────────────────────────────────────
     case 'commit': {
-      const repo = needRepo();
-      const msg  = optArg('-m');
-      if (!msg) die('Commit message required (-m)');
-      out(commit(repo, { message: msg }));
+      const repo  = needRepo();
+      const amend = flag('--amend');
+      const msg   = optArg('-m') ?? '';
+      if (!amend && !msg) die('Commit message required (-m)');
+      out(commit(repo, { message: msg, amend }));
       break;
     }
 
@@ -419,6 +426,43 @@ try {
         directory,
         onProgress: (m) => process.stderr.write(m + '\n'),
       }).then(out).catch((e: Error) => die(e.message));
+      break;
+    }
+
+    // ── show ──────────────────────────────────────────────────────────────
+    case 'show': {
+      const repo = needRepo();
+      const stat = flag('--stat');
+      const ref  = positionals(1)[0];
+      out(gitShow(repo, { ref, stat }));
+      break;
+    }
+
+    // ── merge ─────────────────────────────────────────────────────────────
+    case 'merge': {
+      const repo   = needRepo();
+      const noFf   = flag('--no-ff');
+      const msg    = optArg('-m');
+      const branch = positionals(1)[0];
+      if (!branch) die('merge: branch name required');
+      out(gitMerge(repo, { branch, message: msg, noFf }));
+      break;
+    }
+
+    // ── stash ─────────────────────────────────────────────────────────────
+    case 'stash': {
+      const repo = needRepo();
+      const sub  = args[1];
+      // 'push' is the default; distinguish from a branch-name positional
+      const knownSubs = ['push', 'pop', 'list', 'drop', 'show'];
+      const isSub = sub && knownSubs.includes(sub);
+      const subCmd = isSub ? sub : (sub === undefined ? 'push' : undefined);
+      if (subCmd === undefined) die(`stash: unknown subcommand '${sub}'`);
+      const msg  = optArg('-m');
+      const ref  = isSub && (sub === 'drop' || sub === 'show')
+        ? positionals(2)[0]
+        : undefined;
+      out(gitStash(repo, { sub: subCmd, message: msg, ref }));
       break;
     }
 
