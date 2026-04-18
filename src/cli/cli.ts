@@ -22,6 +22,11 @@ import { readTree } from '../plumbing/read-tree';
 import { updateIndex } from '../plumbing/update-index';
 import { commitTree } from '../plumbing/commit-tree';
 import { plumbingRevParse } from '../plumbing/rev-parse';
+import { fetch as gitFetch }  from '../porcelain/fetch';
+import { push  as gitPush }   from '../porcelain/push';
+import { pull  as gitPull }   from '../porcelain/pull';
+import { clone as gitClone }  from '../porcelain/clone';
+import { RemoteManager }      from '../core/remote/remote';
 import { ObjectType } from '../types';
 
 const HELP = `
@@ -39,6 +44,11 @@ Porcelain commands:
   reset [--soft|--mixed|--hard] [<commit>]
   tag [<name>]              Create or list lightweight tags
   config [--get] <key> [<value>]
+  remote [-v|add|remove] [<name>] [<url>]
+  fetch [<remote>]          Download objects + update remote-tracking refs
+  push  [<remote>] [<refspec>] [-f]  Upload commits to remote
+  pull  [<remote>] [<branch>]  fetch + fast-forward
+  clone <url> [<directory>] Clone a remote repository
 
 Plumbing commands:
   hash-object [-w] [-t <type>] <file>
@@ -323,6 +333,92 @@ try {
         repo.config.set(section, key, val);
         repo.config.save();
       }
+      break;
+    }
+
+    // ── remote ────────────────────────────────────────────────────────────
+    case 'remote': {
+      const repo    = needRepo();
+      const sub     = args[1];
+      const mgr     = new RemoteManager(repo);
+
+      if (!sub || sub === 'show' || sub === '-v') {
+        const remotes = mgr.list();
+        if (remotes.length === 0) { out('(no remotes configured)'); break; }
+        for (const r of remotes) out(sub === '-v' ? `${r.name}\t${r.url}` : r.name);
+        break;
+      }
+      if (sub === 'add') {
+        const name = args[2]; const url = args[3];
+        if (!name || !url) die('remote add: <name> <url> required');
+        mgr.add(name, url);
+        out(`Added remote '${name}' → ${url}`);
+        break;
+      }
+      if (sub === 'remove' || sub === 'rm') {
+        const name = args[2];
+        if (!name) die('remote remove: <name> required');
+        mgr.remove(name);
+        out(`Removed remote '${name}'`);
+        break;
+      }
+      die(`remote: unknown subcommand '${sub}'`);
+    }
+
+    // ── fetch ─────────────────────────────────────────────────────────────
+    case 'fetch': {
+      const repo    = needRepo();
+      const remote  = positionals(1)[0];
+      const verbose = flag('-v') || flag('--verbose');
+      out('Fetching...');
+      gitFetch(repo, {
+        remote,
+        verbose,
+        onProgress: (m) => process.stderr.write(m + '\n'),
+      }).then(out).catch((e: Error) => die(e.message));
+      break;
+    }
+
+    // ── push ──────────────────────────────────────────────────────────────
+    case 'push': {
+      const repo    = needRepo();
+      const remote  = positionals(1)[0];
+      const refspec = positionals(1)[1];
+      const force   = flag('-f') || flag('--force');
+      out('Pushing...');
+      gitPush(repo, {
+        remote,
+        refspec,
+        force,
+        onProgress: (m) => process.stderr.write(m + '\n'),
+      }).then(out).catch((e: Error) => die(e.message));
+      break;
+    }
+
+    // ── pull ──────────────────────────────────────────────────────────────
+    case 'pull': {
+      const repo   = needRepo();
+      const remote = positionals(1)[0];
+      const branch = positionals(1)[1];
+      out('Pulling...');
+      gitPull(repo, {
+        remote,
+        branch,
+        onProgress: (m) => process.stderr.write(m + '\n'),
+      }).then(out).catch((e: Error) => die(e.message));
+      break;
+    }
+
+    // ── clone ─────────────────────────────────────────────────────────────
+    case 'clone': {
+      const url = positionals(1)[0];
+      if (!url) die('clone: URL required');
+      const directory = positionals(1)[1];
+      gitClone({
+        url,
+        directory,
+        onProgress: (m) => process.stderr.write(m + '\n'),
+      }).then(out).catch((e: Error) => die(e.message));
       break;
     }
 

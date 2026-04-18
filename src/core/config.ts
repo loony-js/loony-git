@@ -44,6 +44,11 @@ export class GitConfig {
     return this.data[section] ?? {};
   }
 
+  // Return all section keys (e.g. "remote.origin", "branch.main", "core")
+  sections(): string[] {
+    return Object.keys(this.data);
+  }
+
   private parse(text: string): void {
     let currentSection = '';
     for (const rawLine of text.split('\n')) {

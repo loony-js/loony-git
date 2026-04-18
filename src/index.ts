@@ -20,8 +20,22 @@ export { commitTree } from './plumbing/commit-tree';
 export { plumbingRevParse } from './plumbing/rev-parse';
 
 // Core utilities
-export { revParse } from './core/revision';
+export { revParse }  from './core/revision';
 export { GitIgnore } from './core/ignore';
+
+// Pack / transport
+export { PackfileReader, buildPackfile } from './core/pack/packfile';
+export { applyDelta }    from './core/pack/delta';
+export { encodePkt, PKT_FLUSH, PktLineDecoder, parseRefAdvertisement } from './core/pack/pktline';
+export { RemoteManager, parseRemoteUrl } from './core/remote/remote';
+export { discoverRefs, fetchPack }       from './core/remote/upload-pack';
+export { discoverReceiveRefs, pushPack, collectObjectsForPush } from './core/remote/receive-pack';
+
+// Remote porcelain
+export { fetch }  from './porcelain/fetch';
+export { push }   from './porcelain/push';
+export { pull }   from './porcelain/pull';
+export { clone }  from './porcelain/clone';
 
 // Porcelain
 export { init } from './porcelain/init';
