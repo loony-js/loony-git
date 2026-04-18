@@ -13,10 +13,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import * as zlib from 'zlib';
 import { Repository } from '../core/repository';
 import { TreeObject } from '../core/objects/tree';
 import { CommitObjectParser } from '../core/objects/commit';
+import { GitIgnore } from '../core/ignore';
 import { IndexEntry } from '../types';
 
 interface StatusResult {
@@ -57,8 +57,11 @@ export function status(repo: Repository): StatusResult {
   const unstaged: StatusResult['unstaged'] = [];
   const untracked: string[] = [];
 
+  const ignore = new GitIgnore(repo.workDir, repo.gitDir);
+  ignore.loadAll(repo.config.get('core', 'excludesFile'));
+
   const workFiles = new Set<string>();
-  collectWorkdir(repo.workDir, repo.gitDir, workFiles, repo.workDir);
+  collectWorkdir(repo.workDir, repo.gitDir, ignore, workFiles, repo.workDir);
 
   for (const rel of workFiles) {
     if (!indexMap.has(rel)) {
@@ -179,16 +182,20 @@ function flattenTree(
 function collectWorkdir(
   dir: string,
   gitDir: string,
+  ignore: GitIgnore,
   out: Set<string>,
   root: string
 ): void {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const abs = path.join(dir, entry.name);
     if (path.resolve(abs) === path.resolve(gitDir)) continue;
+    const rel = path.relative(root, abs).split(path.sep).join('/');
     if (entry.isDirectory()) {
-      collectWorkdir(abs, gitDir, out, root);
+      if (ignore.isIgnored(rel, true)) continue;
+      collectWorkdir(abs, gitDir, ignore, out, root);
     } else if (entry.isFile()) {
-      out.add(path.relative(root, abs).split(path.sep).join('/'));
+      if (ignore.isIgnored(rel, false)) continue;
+      out.add(rel);
     }
   }
 }

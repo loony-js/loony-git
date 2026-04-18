@@ -21,6 +21,7 @@ import { writeTree } from '../plumbing/write-tree';
 import { readTree } from '../plumbing/read-tree';
 import { updateIndex } from '../plumbing/update-index';
 import { commitTree } from '../plumbing/commit-tree';
+import { plumbingRevParse } from '../plumbing/rev-parse';
 import { ObjectType } from '../types';
 
 const HELP = `
@@ -46,6 +47,7 @@ Plumbing commands:
   read-tree <tree-sha>
   update-index --add|--remove <file>...
   commit-tree <tree-sha> [-p <parent>]... -m <msg>
+  rev-parse [--abbrev-ref] [--short] <rev>
 `.trim();
 
 const args = process.argv.slice(2);
@@ -267,6 +269,17 @@ try {
       }
       const msg = optArg('-m') ?? '';
       out(commitTree(repo, { tree, parents, message: msg }));
+      break;
+    }
+
+    // ── rev-parse ─────────────────────────────────────────────────────────
+    case 'rev-parse': {
+      const repo       = needRepo();
+      const abbrevRef  = flag('--abbrev-ref');
+      const short      = flag('--short');
+      const expr       = positionals(1)[0];
+      if (!expr) die('rev-parse: requires a revision argument');
+      out(plumbingRevParse(repo, { expr, abbrevRef, short }));
       break;
     }
 

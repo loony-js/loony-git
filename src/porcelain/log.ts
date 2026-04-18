@@ -10,6 +10,7 @@
  */
 
 import { Repository } from '../core/repository';
+import { revParse } from '../core/revision';
 import { CommitObjectParser } from '../core/objects/commit';
 import { CommitObject } from '../types';
 
@@ -26,7 +27,7 @@ export interface LogEntry {
 
 export function log(repo: Repository, opts: LogOptions = {}): LogEntry[] {
   const startHash = opts.startRef
-    ? repo.refs.resolve(opts.startRef) ?? opts.startRef
+    ? revParse(repo, opts.startRef)
     : repo.refs.resolveHead();
 
   if (!startHash) {

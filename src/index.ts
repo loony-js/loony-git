@@ -17,6 +17,11 @@ export { writeTree } from './plumbing/write-tree';
 export { readTree } from './plumbing/read-tree';
 export { updateIndex } from './plumbing/update-index';
 export { commitTree } from './plumbing/commit-tree';
+export { plumbingRevParse } from './plumbing/rev-parse';
+
+// Core utilities
+export { revParse } from './core/revision';
+export { GitIgnore } from './core/ignore';
 
 // Porcelain
 export { init } from './porcelain/init';

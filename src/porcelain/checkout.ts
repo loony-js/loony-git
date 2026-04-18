@@ -19,6 +19,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from '../core/repository';
+import { revParse } from '../core/revision';
 import { TreeObject } from '../core/objects/tree';
 import { CommitObjectParser } from '../core/objects/commit';
 import { BlobObject } from '../core/objects/blob';
@@ -37,35 +38,21 @@ export function checkout(repo: Repository, opts: CheckoutOptions): string {
   }
 
   // ---- resolve target to a commit SHA -------------------------------------
-  let commitSha = repo.refs.resolve(opts.target);
   const isNewBranch = opts.createBranch;
-
-  if (!commitSha) {
-    // Maybe it's a raw commit SHA
-    if (/^[0-9a-f]{7,40}$/.test(opts.target) && repo.store.exists(
-      opts.target.length === 40
-        ? opts.target
-        : repo.store.listAll().find(h => h.startsWith(opts.target)) ?? ''
-    )) {
-      commitSha = opts.target.length === 40
-        ? opts.target
-        : repo.store.listAll().find(h => h.startsWith(opts.target))!;
-    } else if (!isNewBranch) {
-      throw new Error(`error: pathspec '${opts.target}' did not match any known refs`);
-    }
-  }
+  let commitSha: string;
 
   if (isNewBranch) {
     if (repo.refs.branchExists(opts.target)) {
       throw new Error(`fatal: A branch named '${opts.target}' already exists`);
     }
-    const base = commitSha ?? repo.refs.resolveHead();
+    const base = repo.refs.resolveHead();
     if (!base) throw new Error('fatal: no commits yet');
     repo.refs.createBranch(opts.target, base);
     commitSha = base;
+  } else {
+    // revParse handles branch names, tags, SHAs, HEAD~N, etc.
+    commitSha = revParse(repo, opts.target);
   }
-
-  if (!commitSha) throw new Error(`fatal: Could not resolve '${opts.target}'`);
 
   // ---- build flat map of target tree (path → { hash, mode }) -------------
   const commit = CommitObjectParser.read(repo.store, commitSha);

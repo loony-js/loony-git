@@ -14,6 +14,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from '../core/repository';
+import { revParse } from '../core/revision';
 import { CommitObjectParser } from '../core/objects/commit';
 import { TreeObject } from '../core/objects/tree';
 import { BlobObject } from '../core/objects/blob';
@@ -35,20 +36,7 @@ export function reset(repo: Repository, opts: ResetOptions): string {
 
   // ---- Resolve target commit ----------------------------------------------
   const targetStr = opts.target ?? 'HEAD';
-  let commitSha = repo.refs.resolve(targetStr) ?? repo.refs.resolveHead();
-
-  if (!commitSha) throw new Error(`fatal: Failed to resolve '${targetStr}'`);
-
-  // If target looks like a raw SHA, resolve it directly
-  if (/^[0-9a-f]{7,40}$/.test(targetStr) && repo.store.exists(
-    targetStr.length === 40
-      ? targetStr
-      : repo.store.listAll().find(h => h.startsWith(targetStr)) ?? ''
-  )) {
-    commitSha = targetStr.length === 40
-      ? targetStr
-      : repo.store.listAll().find(h => h.startsWith(targetStr))!;
-  }
+  const commitSha = revParse(repo, targetStr);
 
   const targetCommit = CommitObjectParser.read(repo.store, commitSha);
 
