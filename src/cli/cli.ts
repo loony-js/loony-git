@@ -1,0 +1,330 @@
+#!/usr/bin/env node
+/**
+ * CLI entry point — dispatches to plumbing and porcelain commands.
+ *
+ * Usage:
+ *   lgit <command> [options] [args]
+ */
+
+import { Repository } from '../core/repository';
+import { init } from '../porcelain/init';
+import { add } from '../porcelain/add';
+import { commit } from '../porcelain/commit';
+import { status, formatStatus } from '../porcelain/status';
+import { log, formatLog } from '../porcelain/log';
+import { branch } from '../porcelain/branch';
+import { checkout } from '../porcelain/checkout';
+import { reset } from '../porcelain/reset';
+import { hashObject } from '../plumbing/hash-object';
+import { catFile } from '../plumbing/cat-file';
+import { writeTree } from '../plumbing/write-tree';
+import { readTree } from '../plumbing/read-tree';
+import { updateIndex } from '../plumbing/update-index';
+import { commitTree } from '../plumbing/commit-tree';
+import { ObjectType } from '../types';
+
+const HELP = `
+usage: lgit <command> [<args>]
+
+Porcelain commands:
+  init [<dir>]              Create an empty repository
+  add <pathspec>...         Add files to the index
+  commit -m <msg>           Record staged changes
+  status                    Show working tree status
+  log [--oneline] [-n <n>]  Show commit history
+  branch [<name>] [-d <n>]  Create/list/delete branches
+  checkout [-b] <target>    Switch branches or restore files
+  checkout -- <file>...     Restore files from index
+  reset [--soft|--mixed|--hard] [<commit>]
+  tag [<name>]              Create or list lightweight tags
+  config [--get] <key> [<value>]
+
+Plumbing commands:
+  hash-object [-w] [-t <type>] <file>
+  cat-file [-t|-s|-p] <hash>
+  write-tree
+  read-tree <tree-sha>
+  update-index --add|--remove <file>...
+  commit-tree <tree-sha> [-p <parent>]... -m <msg>
+`.trim();
+
+const args = process.argv.slice(2);
+const command = args[0];
+
+function die(msg: string): never {
+  process.stderr.write(`lgit: ${msg}\n`);
+  process.exit(1);
+}
+
+function out(msg: string): void {
+  if (msg) process.stdout.write(msg + '\n');
+}
+
+function needRepo(): Repository {
+  try {
+    return Repository.find();
+  } catch (e: any) {
+    die(e.message);
+  }
+}
+
+// ---- Argument helpers -------------------------------------------------------
+
+function flag(name: string): boolean {
+  return args.includes(name);
+}
+
+function optArg(name: string): string | undefined {
+  const idx = args.indexOf(name);
+  return idx !== -1 ? args[idx + 1] : undefined;
+}
+
+function positionals(from: number): string[] {
+  return args.slice(from).filter(a => !a.startsWith('-'));
+}
+
+// ---- Command dispatch -------------------------------------------------------
+
+try {
+  switch (command) {
+
+    // ── init ──────────────────────────────────────────────────────────────
+    case 'init': {
+      const dir = args[1];
+      out(init(dir));
+      break;
+    }
+
+    // ── add ───────────────────────────────────────────────────────────────
+    case 'add': {
+      const repo = needRepo();
+      const paths = args.slice(1);
+      if (paths.length === 0) die('Nothing specified, nothing added.');
+      add(repo, paths);
+      break;
+    }
+
+    // ── commit ────────────────────────────────────────────────────────────
+    case 'commit': {
+      const repo = needRepo();
+      const msg  = optArg('-m');
+      if (!msg) die('Commit message required (-m)');
+      out(commit(repo, { message: msg }));
+      break;
+    }
+
+    // ── status ────────────────────────────────────────────────────────────
+    case 'status': {
+      const repo = needRepo();
+      out(formatStatus(status(repo)));
+      break;
+    }
+
+    // ── log ───────────────────────────────────────────────────────────────
+    case 'log': {
+      const repo     = needRepo();
+      const oneline  = flag('--oneline');
+      const nArg     = optArg('-n');
+      const maxCount = nArg ? parseInt(nArg, 10) : undefined;
+      const startRef = positionals(1)[0];
+      out(formatLog(log(repo, { oneline, maxCount, startRef }), oneline));
+      break;
+    }
+
+    // ── branch ────────────────────────────────────────────────────────────
+    case 'branch': {
+      const repo = needRepo();
+      const dFlag = optArg('-d');
+      if (dFlag) {
+        out(branch(repo, { delete: dFlag }));
+      } else {
+        const name       = positionals(1)[0];
+        const startPoint = positionals(1)[1];
+        out(branch(repo, { name, startPoint }));
+      }
+      break;
+    }
+
+    // ── checkout ──────────────────────────────────────────────────────────
+    case 'checkout': {
+      const repo = needRepo();
+      const bFlag = flag('-b');
+      const dashDash = args.indexOf('--');
+
+      if (dashDash !== -1) {
+        // lgit checkout -- <files>
+        const files = args.slice(dashDash + 1);
+        out(checkout(repo, { target: '--', files }));
+      } else {
+        const target = positionals(1)[0];
+        if (!target) die('No target specified');
+        out(checkout(repo, { target, createBranch: bFlag }));
+      }
+      break;
+    }
+
+    // ── reset ─────────────────────────────────────────────────────────────
+    case 'reset': {
+      const repo = needRepo();
+      const mode =
+        flag('--soft')  ? 'soft'  :
+        flag('--hard')  ? 'hard'  : 'mixed';
+
+      // lgit reset HEAD <file>...
+      const headIdx = args.indexOf('HEAD');
+      if (headIdx !== -1 && args.length > headIdx + 1) {
+        const files = args.slice(headIdx + 1);
+        out(reset(repo, { mode, files }));
+      } else {
+        const target = positionals(1).find(a => a !== 'HEAD');
+        out(reset(repo, { mode, target }));
+      }
+      break;
+    }
+
+    // ── hash-object ───────────────────────────────────────────────────────
+    case 'hash-object': {
+      const repo  = needRepo();
+      const write = flag('-w');
+      const type  = (optArg('-t') ?? 'blob') as ObjectType;
+      const file  = positionals(1)[0];
+      if (!file) die('hash-object: requires a file argument');
+      out(hashObject(repo, { write, type, file }));
+      break;
+    }
+
+    // ── cat-file ──────────────────────────────────────────────────────────
+    case 'cat-file': {
+      const repo = needRepo();
+      let mode: 'type' | 'size' | 'pretty' | 'raw';
+      let hash: string;
+
+      if (flag('-t')) {
+        mode = 'type';
+        hash = positionals(1)[0];
+      } else if (flag('-s')) {
+        mode = 'size';
+        hash = positionals(1)[0];
+      } else if (flag('-p')) {
+        mode = 'pretty';
+        hash = positionals(1)[0];
+      } else {
+        mode = 'raw';
+        hash = positionals(1)[0];
+      }
+      if (!hash) die('cat-file: requires an object hash');
+      out(catFile(repo, { mode, hash }));
+      break;
+    }
+
+    // ── write-tree ────────────────────────────────────────────────────────
+    case 'write-tree': {
+      const repo = needRepo();
+      out(writeTree(repo));
+      break;
+    }
+
+    // ── read-tree ─────────────────────────────────────────────────────────
+    case 'read-tree': {
+      const repo = needRepo();
+      const sha  = positionals(1)[0];
+      if (!sha) die('read-tree: requires a tree SHA');
+      readTree(repo, sha);
+      break;
+    }
+
+    // ── update-index ──────────────────────────────────────────────────────
+    case 'update-index': {
+      const repo    = needRepo();
+      const addFlag = flag('--add');
+      const rmFlag  = flag('--remove');
+
+      if (addFlag) {
+        const files = positionals(1);
+        updateIndex(repo, { add: files });
+      } else if (rmFlag) {
+        const files = positionals(1);
+        updateIndex(repo, { remove: files });
+      } else {
+        die('update-index: specify --add or --remove');
+      }
+      break;
+    }
+
+    // ── commit-tree ───────────────────────────────────────────────────────
+    case 'commit-tree': {
+      const repo = needRepo();
+      const tree = positionals(1)[0];
+      if (!tree) die('commit-tree: requires a tree SHA');
+
+      // Collect all -p parent arguments
+      const parents: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '-p' && args[i + 1]) {
+          parents.push(args[i + 1]);
+          i++;
+        }
+      }
+      const msg = optArg('-m') ?? '';
+      out(commitTree(repo, { tree, parents, message: msg }));
+      break;
+    }
+
+    // ── tag ───────────────────────────────────────────────────────────────
+    case 'tag': {
+      const repo = needRepo();
+      const name = positionals(1)[0];
+      if (!name) {
+        // List tags
+        out(repo.refs.listTags().join('\n'));
+      } else {
+        const sha = repo.refs.resolveHead();
+        if (!sha) die('fatal: no commits yet');
+        repo.refs.createTag(name, sha);
+        out(`Created tag '${name}'`);
+      }
+      break;
+    }
+
+    // ── config ────────────────────────────────────────────────────────────
+    case 'config': {
+      // lgit config user.name "John"
+      // lgit config --get user.name
+      const repo   = needRepo();
+      const getMode = flag('--get');
+      const keyArg = positionals(1)[0];
+      if (!keyArg) die('config: key required');
+
+      const dotIdx  = keyArg.indexOf('.');
+      if (dotIdx === -1) die('config: key must be in <section>.<name> form');
+      const section = keyArg.slice(0, dotIdx);
+      const key     = keyArg.slice(dotIdx + 1);
+
+      if (getMode) {
+        const val = repo.config.get(section, key);
+        if (val === undefined) die(`error: key does not exist: ${keyArg}`);
+        out(val);
+      } else {
+        const val = positionals(1)[1];
+        if (val === undefined) die('config: value required');
+        repo.config.set(section, key, val);
+        repo.config.save();
+      }
+      break;
+    }
+
+    // ── help / default ────────────────────────────────────────────────────
+    case undefined:
+    case '--help':
+    case 'help': {
+      out(HELP);
+      break;
+    }
+
+    default:
+      die(`'${command}' is not a lgit command. See 'lgit help'.`);
+  }
+} catch (err: any) {
+  die(err.message ?? String(err));
+}
+

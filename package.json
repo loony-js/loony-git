@@ -1,0 +1,22 @@
+{
+  "name": "loony-git",
+  "version": "0.1.0",
+  "description": "High-fidelity Git reimplementation in TypeScript",
+  "main": "dist/index.js",
+  "bin": {
+    "lgit": "dist/cli/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/cli.js",
+    "test": "node dist/cli/cli.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
