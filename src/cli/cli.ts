@@ -33,6 +33,12 @@ import { merge as gitMerge } from "../porcelain/merge";
 import { stash as gitStash } from "../porcelain/stash";
 import { RemoteManager } from "../core/remote/remote";
 import { ObjectType } from "../types";
+import {
+  uploadPackAdvertise,
+  uploadPackStateless,
+  receivePackAdvertise,
+  receivePackStateless,
+} from "../core/remote/server-pack";
 
 const HELP = `
 usage: lgit <command> [<args>]
@@ -481,6 +487,34 @@ try {
 
     // ── help / default ────────────────────────────────────────────────────
     case undefined:
+    // ── upload-pack (server-side: serve fetch/clone) ──────────────────────
+    case "upload-pack": {
+      const repoPath = positionals(1)[0];
+      if (!repoPath) die("usage: lgit upload-pack [--stateless-rpc] [--advertise-refs] <repo>");
+      if (flag("--advertise-refs")) {
+        uploadPackAdvertise(repoPath);
+      } else if (flag("--stateless-rpc")) {
+        uploadPackStateless(repoPath);
+      } else {
+        die("upload-pack: expected --stateless-rpc");
+      }
+      break;
+    }
+
+    // ── receive-pack (server-side: accept push) ────────────────────────────
+    case "receive-pack": {
+      const repoPath = positionals(1)[0];
+      if (!repoPath) die("usage: lgit receive-pack [--stateless-rpc] [--advertise-refs] <repo>");
+      if (flag("--advertise-refs")) {
+        receivePackAdvertise(repoPath);
+      } else if (flag("--stateless-rpc")) {
+        receivePackStateless(repoPath);
+      } else {
+        die("receive-pack: expected --stateless-rpc");
+      }
+      break;
+    }
+
     case "--help":
     case "help": {
       out(HELP);

@@ -129,10 +129,7 @@ function request(
       res.on("error", reject);
     });
 
-    req.on("error", (e) => {
-      console.log("Error--------------------", e);
-      reject(e);
-    });
+    req.on("error", reject);
     if (body) req.write(body);
     req.end();
   });

@@ -43,13 +43,11 @@ export async function push(
   const url = remote.url;
 
   // 1. Discover remote refs
-  console.log("// 1. Discover remote refs");
   const advert = await discoverReceiveRefs(url);
   const remoteRefMap = new Map(advert.refs.map((r) => [r.name, r.sha]));
   const remoteHas = new Set(advert.refs.map((r) => r.sha));
 
   // 2. Determine which local branches to push
-  console.log("// 2. Determine which local branches to push");
   const refspecs = resolveRefspecs(repo, opts.refspec);
   if (refspecs.length === 0) return "Everything up-to-date";
 
@@ -94,7 +92,6 @@ export async function push(
   }
 
   // 3. Collect objects
-  console.log("// 3. Collect objects");
   const toSend = collectObjectsForPush(
     repo.store,
     updates.map((u) => u.newSha),
@@ -102,7 +99,6 @@ export async function push(
   );
 
   // 4. Push
-  console.log("// 4. Push");
   const result = await pushPack({
     url,
     updates,
@@ -112,7 +108,6 @@ export async function push(
   });
 
   // 5. Update remote tracking refs on success
-  console.log("// 5. Update remote tracking refs on success");
   for (const okRef of result.ok) {
     const branch = okRef.replace("refs/heads/", "");
     const newSha = updates.find((u) => u.refname === okRef)?.newSha;

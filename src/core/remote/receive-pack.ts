@@ -42,7 +42,6 @@ export async function discoverReceiveRefs(
     Accept: "application/x-git-receive-pack-advertisement",
   });
 
-  console.log(resp);
   if (resp.status === 401)
     throw new Error(`Authentication required for ${url}`);
   if (resp.status !== 200)
