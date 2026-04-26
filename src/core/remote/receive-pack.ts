@@ -17,29 +17,36 @@
  *   Include commits, their trees, and all referenced blobs/tags.
  */
 
-import { httpGet, httpPost } from './transport';
+import { httpGet, httpPost } from "./transport";
 import {
-  encodePkt, PKT_FLUSH,
-  parseRefAdvertisement, RefAdvertisement,
-} from '../pack/pktline';
-import { buildPackfile } from '../pack/packfile';
-import { ObjectStore, RawObject } from '../objects/store';
-import { CommitObjectParser } from '../objects/commit';
-import { TreeObject } from '../objects/tree';
-import { ObjectType } from '../../types';
+  encodePkt,
+  PKT_FLUSH,
+  parseRefAdvertisement,
+  RefAdvertisement,
+} from "../pack/pktline";
+import { buildPackfile } from "../pack/packfile";
+import { ObjectStore, RawObject } from "../objects/store";
+import { CommitObjectParser } from "../objects/commit";
+import { TreeObject } from "../objects/tree";
+import { ObjectType } from "../../types";
 
 export { RefAdvertisement };
 
 // ---- ref discovery ---------------------------------------------------------
 
-export async function discoverReceiveRefs(url: string): Promise<RefAdvertisement> {
+export async function discoverReceiveRefs(
+  url: string,
+): Promise<RefAdvertisement> {
   const infoUrl = `${url}/info/refs?service=git-receive-pack`;
   const resp = await httpGet(infoUrl, {
-    'Accept': 'application/x-git-receive-pack-advertisement',
+    Accept: "application/x-git-receive-pack-advertisement",
   });
 
-  if (resp.status === 401) throw new Error(`Authentication required for ${url}`);
-  if (resp.status !== 200) throw new Error(`HTTP ${resp.status} from ${infoUrl}`);
+  console.log(resp);
+  if (resp.status === 401)
+    throw new Error(`Authentication required for ${url}`);
+  if (resp.status !== 200)
+    throw new Error(`HTTP ${resp.status} from ${infoUrl}`);
 
   return parseRefAdvertisement(resp.body);
 }
@@ -48,21 +55,21 @@ export async function discoverReceiveRefs(url: string): Promise<RefAdvertisement
 
 export interface RefUpdate {
   refname: string;
-  oldSha:  string;  // all-zeros = create
-  newSha:  string;  // all-zeros = delete
+  oldSha: string; // all-zeros = create
+  newSha: string; // all-zeros = delete
 }
 
 export interface PushOptions {
-  url:        string;
-  updates:    RefUpdate[];
-  store:      ObjectStore;
-  remoteShas: Set<string>;   // SHAs the remote already has
+  url: string;
+  updates: RefUpdate[];
+  store: ObjectStore;
+  remoteShas: Set<string>; // SHAs the remote already has
   onProgress?: (msg: string) => void;
 }
 
 export interface PushResult {
-  ok:      string[];    // ref names that succeeded
-  failed:  { ref: string; reason: string }[];
+  ok: string[]; // ref names that succeeded
+  failed: { ref: string; reason: string }[];
 }
 
 export async function pushPack(opts: PushOptions): Promise<PushResult> {
@@ -70,8 +77,8 @@ export async function pushPack(opts: PushOptions): Promise<PushResult> {
 
   // --- collect objects to send ---
   const tips = opts.updates
-    .filter(u => u.newSha !== '0'.repeat(40))
-    .map(u => u.newSha);
+    .filter((u) => u.newSha !== "0".repeat(40))
+    .map((u) => u.newSha);
 
   const toSend = collectObjectsForPush(opts.store, tips, opts.remoteShas);
 
@@ -90,18 +97,17 @@ export async function pushPack(opts: PushOptions): Promise<PushResult> {
 
   const reqBody = Buffer.concat(parts);
 
-  const resp = await httpPost(
-    `${opts.url}/git-receive-pack`,
-    reqBody,
-    {
-      'Content-Type': 'application/x-git-receive-pack-request',
-      'Accept':       'application/x-git-receive-pack-result',
-    }
-  );
+  const resp = await httpPost(`${opts.url}/git-receive-pack`, reqBody, {
+    "Content-Type": "application/x-git-receive-pack-request",
+    Accept: "application/x-git-receive-pack-result",
+  });
 
-  if (resp.status === 401) throw new Error(`Authentication required for ${opts.url}`);
+  if (resp.status === 401)
+    throw new Error(`Authentication required for ${opts.url}`);
   if (resp.status !== 200) {
-    throw new Error(`HTTP ${resp.status} from git-receive-pack\n${resp.body.slice(0,200).toString()}`);
+    throw new Error(
+      `HTTP ${resp.status} from git-receive-pack\n${resp.body.slice(0, 200).toString()}`,
+    );
   }
 
   return parseReceivePackResponse(resp.body, opts.updates);
@@ -112,11 +118,11 @@ export async function pushPack(opts: PushOptions): Promise<PushResult> {
 export function collectObjectsForPush(
   store: ObjectStore,
   tips: string[],
-  remoteHas: Set<string>
+  remoteHas: Set<string>,
 ): Map<string, { type: ObjectType; content: Buffer }> {
-  const result  = new Map<string, { type: ObjectType; content: Buffer }>();
+  const result = new Map<string, { type: ObjectType; content: Buffer }>();
   const visited = new Set<string>();
-  const queue   = [...tips];
+  const queue = [...tips];
 
   while (queue.length > 0) {
     const sha = queue.shift()!;
@@ -128,13 +134,13 @@ export function collectObjectsForPush(
     const { type, content } = store.read(sha) as RawObject;
     result.set(sha, { type: type as ObjectType, content });
 
-    if (type === 'commit') {
+    if (type === "commit") {
       const c = CommitObjectParser.deserialize(content);
       if (!remoteHas.has(c.tree) && !result.has(c.tree)) queue.push(c.tree);
       for (const p of c.parents) {
         if (!remoteHas.has(p) && !result.has(p)) queue.push(p);
       }
-    } else if (type === 'tree') {
+    } else if (type === "tree") {
       const t = TreeObject.deserialize(content);
       for (const e of t.entries) {
         if (!remoteHas.has(e.hash) && !result.has(e.hash)) queue.push(e.hash);
@@ -147,18 +153,21 @@ export function collectObjectsForPush(
 
 // ---- response parsing ------------------------------------------------------
 
-function parseReceivePackResponse(body: Buffer, updates: RefUpdate[]): PushResult {
-  const text = body.toString('utf8');
-  const ok: string[]                          = [];
+function parseReceivePackResponse(
+  body: Buffer,
+  updates: RefUpdate[],
+): PushResult {
+  const text = body.toString("utf8");
+  const ok: string[] = [];
   const failed: { ref: string; reason: string }[] = [];
 
   // Basic report-status parsing
-  for (const line of text.split('\n')) {
-    if (line.startsWith('ok ')) {
+  for (const line of text.split("\n")) {
+    if (line.startsWith("ok ")) {
       ok.push(line.slice(3).trim());
-    } else if (line.startsWith('ng ')) {
-      const [, ref, ...reasonParts] = line.split(' ');
-      failed.push({ ref, reason: reasonParts.join(' ') });
+    } else if (line.startsWith("ng ")) {
+      const [, ref, ...reasonParts] = line.split(" ");
+      failed.push({ ref, reason: reasonParts.join(" ") });
     }
   }
 

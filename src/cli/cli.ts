@@ -5,32 +5,34 @@
  * Usage:
  *   lgit <command> [options] [args]
  */
+import { initEnvs } from "../envs";
+initEnvs();
 
-import { Repository } from '../core/repository';
-import { init } from '../porcelain/init';
-import { add } from '../porcelain/add';
-import { commit } from '../porcelain/commit';
-import { status, formatStatus } from '../porcelain/status';
-import { log, formatLog } from '../porcelain/log';
-import { branch } from '../porcelain/branch';
-import { checkout } from '../porcelain/checkout';
-import { reset } from '../porcelain/reset';
-import { hashObject } from '../plumbing/hash-object';
-import { catFile } from '../plumbing/cat-file';
-import { writeTree } from '../plumbing/write-tree';
-import { readTree } from '../plumbing/read-tree';
-import { updateIndex } from '../plumbing/update-index';
-import { commitTree } from '../plumbing/commit-tree';
-import { plumbingRevParse } from '../plumbing/rev-parse';
-import { fetch as gitFetch }  from '../porcelain/fetch';
-import { push  as gitPush }   from '../porcelain/push';
-import { pull  as gitPull }   from '../porcelain/pull';
-import { clone as gitClone }  from '../porcelain/clone';
-import { show  as gitShow }   from '../porcelain/show';
-import { merge as gitMerge }  from '../porcelain/merge';
-import { stash as gitStash }  from '../porcelain/stash';
-import { RemoteManager }      from '../core/remote/remote';
-import { ObjectType } from '../types';
+import { Repository } from "../core/repository";
+import { init } from "../porcelain/init";
+import { add } from "../porcelain/add";
+import { commit } from "../porcelain/commit";
+import { status, formatStatus } from "../porcelain/status";
+import { log, formatLog } from "../porcelain/log";
+import { branch } from "../porcelain/branch";
+import { checkout } from "../porcelain/checkout";
+import { reset } from "../porcelain/reset";
+import { hashObject } from "../plumbing/hash-object";
+import { catFile } from "../plumbing/cat-file";
+import { writeTree } from "../plumbing/write-tree";
+import { readTree } from "../plumbing/read-tree";
+import { updateIndex } from "../plumbing/update-index";
+import { commitTree } from "../plumbing/commit-tree";
+import { plumbingRevParse } from "../plumbing/rev-parse";
+import { fetch as gitFetch } from "../porcelain/fetch";
+import { push as gitPush } from "../porcelain/push";
+import { pull as gitPull } from "../porcelain/pull";
+import { clone as gitClone } from "../porcelain/clone";
+import { show as gitShow } from "../porcelain/show";
+import { merge as gitMerge } from "../porcelain/merge";
+import { stash as gitStash } from "../porcelain/stash";
+import { RemoteManager } from "../core/remote/remote";
+import { ObjectType } from "../types";
 
 const HELP = `
 usage: lgit <command> [<args>]
@@ -75,7 +77,7 @@ function die(msg: string): never {
 }
 
 function out(msg: string): void {
-  if (msg) process.stdout.write(msg + '\n');
+  if (msg) process.stdout.write(msg + "\n");
 }
 
 function needRepo(): Repository {
@@ -98,52 +100,51 @@ function optArg(name: string): string | undefined {
 }
 
 function positionals(from: number): string[] {
-  return args.slice(from).filter(a => !a.startsWith('-'));
+  return args.slice(from).filter((a) => !a.startsWith("-"));
 }
 
 // ---- Command dispatch -------------------------------------------------------
 
 try {
   switch (command) {
-
     // ── init ──────────────────────────────────────────────────────────────
-    case 'init': {
+    case "init": {
       const dir = args[1];
       out(init(dir));
       break;
     }
 
     // ── add ───────────────────────────────────────────────────────────────
-    case 'add': {
+    case "add": {
       const repo = needRepo();
       const paths = args.slice(1);
-      if (paths.length === 0) die('Nothing specified, nothing added.');
+      if (paths.length === 0) die("Nothing specified, nothing added.");
       add(repo, paths);
       break;
     }
 
     // ── commit ────────────────────────────────────────────────────────────
-    case 'commit': {
-      const repo  = needRepo();
-      const amend = flag('--amend');
-      const msg   = optArg('-m') ?? '';
-      if (!amend && !msg) die('Commit message required (-m)');
+    case "commit": {
+      const repo = needRepo();
+      const amend = flag("--amend");
+      const msg = optArg("-m") ?? "";
+      if (!amend && !msg) die("Commit message required (-m)");
       out(commit(repo, { message: msg, amend }));
       break;
     }
 
     // ── status ────────────────────────────────────────────────────────────
-    case 'status': {
+    case "status": {
       const repo = needRepo();
       out(formatStatus(status(repo)));
       break;
     }
 
     // ── log ───────────────────────────────────────────────────────────────
-    case 'log': {
-      const repo     = needRepo();
-      const oneline  = flag('--oneline');
-      const nArg     = optArg('-n');
+    case "log": {
+      const repo = needRepo();
+      const oneline = flag("--oneline");
+      const nArg = optArg("-n");
       const maxCount = nArg ? parseInt(nArg, 10) : undefined;
       const startRef = positionals(1)[0];
       out(formatLog(log(repo, { oneline, maxCount, startRef }), oneline));
@@ -151,13 +152,13 @@ try {
     }
 
     // ── branch ────────────────────────────────────────────────────────────
-    case 'branch': {
+    case "branch": {
       const repo = needRepo();
-      const dFlag = optArg('-d');
+      const dFlag = optArg("-d");
       if (dFlag) {
         out(branch(repo, { delete: dFlag }));
       } else {
-        const name       = positionals(1)[0];
+        const name = positionals(1)[0];
         const startPoint = positionals(1)[1];
         out(branch(repo, { name, startPoint }));
       }
@@ -165,98 +166,96 @@ try {
     }
 
     // ── checkout ──────────────────────────────────────────────────────────
-    case 'checkout': {
+    case "checkout": {
       const repo = needRepo();
-      const bFlag = flag('-b');
-      const dashDash = args.indexOf('--');
+      const bFlag = flag("-b");
+      const dashDash = args.indexOf("--");
 
       if (dashDash !== -1) {
         // lgit checkout -- <files>
         const files = args.slice(dashDash + 1);
-        out(checkout(repo, { target: '--', files }));
+        out(checkout(repo, { target: "--", files }));
       } else {
         const target = positionals(1)[0];
-        if (!target) die('No target specified');
+        if (!target) die("No target specified");
         out(checkout(repo, { target, createBranch: bFlag }));
       }
       break;
     }
 
     // ── reset ─────────────────────────────────────────────────────────────
-    case 'reset': {
+    case "reset": {
       const repo = needRepo();
-      const mode =
-        flag('--soft')  ? 'soft'  :
-        flag('--hard')  ? 'hard'  : 'mixed';
+      const mode = flag("--soft") ? "soft" : flag("--hard") ? "hard" : "mixed";
 
       // lgit reset HEAD <file>...
-      const headIdx = args.indexOf('HEAD');
+      const headIdx = args.indexOf("HEAD");
       if (headIdx !== -1 && args.length > headIdx + 1) {
         const files = args.slice(headIdx + 1);
         out(reset(repo, { mode, files }));
       } else {
-        const target = positionals(1).find(a => a !== 'HEAD');
+        const target = positionals(1).find((a) => a !== "HEAD");
         out(reset(repo, { mode, target }));
       }
       break;
     }
 
     // ── hash-object ───────────────────────────────────────────────────────
-    case 'hash-object': {
-      const repo  = needRepo();
-      const write = flag('-w');
-      const type  = (optArg('-t') ?? 'blob') as ObjectType;
-      const file  = positionals(1)[0];
-      if (!file) die('hash-object: requires a file argument');
+    case "hash-object": {
+      const repo = needRepo();
+      const write = flag("-w");
+      const type = (optArg("-t") ?? "blob") as ObjectType;
+      const file = positionals(1)[0];
+      if (!file) die("hash-object: requires a file argument");
       out(hashObject(repo, { write, type, file }));
       break;
     }
 
     // ── cat-file ──────────────────────────────────────────────────────────
-    case 'cat-file': {
+    case "cat-file": {
       const repo = needRepo();
-      let mode: 'type' | 'size' | 'pretty' | 'raw';
+      let mode: "type" | "size" | "pretty" | "raw";
       let hash: string;
 
-      if (flag('-t')) {
-        mode = 'type';
+      if (flag("-t")) {
+        mode = "type";
         hash = positionals(1)[0];
-      } else if (flag('-s')) {
-        mode = 'size';
+      } else if (flag("-s")) {
+        mode = "size";
         hash = positionals(1)[0];
-      } else if (flag('-p')) {
-        mode = 'pretty';
+      } else if (flag("-p")) {
+        mode = "pretty";
         hash = positionals(1)[0];
       } else {
-        mode = 'raw';
+        mode = "raw";
         hash = positionals(1)[0];
       }
-      if (!hash) die('cat-file: requires an object hash');
+      if (!hash) die("cat-file: requires an object hash");
       out(catFile(repo, { mode, hash }));
       break;
     }
 
     // ── write-tree ────────────────────────────────────────────────────────
-    case 'write-tree': {
+    case "write-tree": {
       const repo = needRepo();
       out(writeTree(repo));
       break;
     }
 
     // ── read-tree ─────────────────────────────────────────────────────────
-    case 'read-tree': {
+    case "read-tree": {
       const repo = needRepo();
-      const sha  = positionals(1)[0];
-      if (!sha) die('read-tree: requires a tree SHA');
+      const sha = positionals(1)[0];
+      if (!sha) die("read-tree: requires a tree SHA");
       readTree(repo, sha);
       break;
     }
 
     // ── update-index ──────────────────────────────────────────────────────
-    case 'update-index': {
-      const repo    = needRepo();
-      const addFlag = flag('--add');
-      const rmFlag  = flag('--remove');
+    case "update-index": {
+      const repo = needRepo();
+      const addFlag = flag("--add");
+      const rmFlag = flag("--remove");
 
       if (addFlag) {
         const files = positionals(1);
@@ -265,51 +264,51 @@ try {
         const files = positionals(1);
         updateIndex(repo, { remove: files });
       } else {
-        die('update-index: specify --add or --remove');
+        die("update-index: specify --add or --remove");
       }
       break;
     }
 
     // ── commit-tree ───────────────────────────────────────────────────────
-    case 'commit-tree': {
+    case "commit-tree": {
       const repo = needRepo();
       const tree = positionals(1)[0];
-      if (!tree) die('commit-tree: requires a tree SHA');
+      if (!tree) die("commit-tree: requires a tree SHA");
 
       // Collect all -p parent arguments
       const parents: string[] = [];
       for (let i = 0; i < args.length; i++) {
-        if (args[i] === '-p' && args[i + 1]) {
+        if (args[i] === "-p" && args[i + 1]) {
           parents.push(args[i + 1]);
           i++;
         }
       }
-      const msg = optArg('-m') ?? '';
+      const msg = optArg("-m") ?? "";
       out(commitTree(repo, { tree, parents, message: msg }));
       break;
     }
 
     // ── rev-parse ─────────────────────────────────────────────────────────
-    case 'rev-parse': {
-      const repo       = needRepo();
-      const abbrevRef  = flag('--abbrev-ref');
-      const short      = flag('--short');
-      const expr       = positionals(1)[0];
-      if (!expr) die('rev-parse: requires a revision argument');
+    case "rev-parse": {
+      const repo = needRepo();
+      const abbrevRef = flag("--abbrev-ref");
+      const short = flag("--short");
+      const expr = positionals(1)[0];
+      if (!expr) die("rev-parse: requires a revision argument");
       out(plumbingRevParse(repo, { expr, abbrevRef, short }));
       break;
     }
 
     // ── tag ───────────────────────────────────────────────────────────────
-    case 'tag': {
+    case "tag": {
       const repo = needRepo();
       const name = positionals(1)[0];
       if (!name) {
         // List tags
-        out(repo.refs.listTags().join('\n'));
+        out(repo.refs.listTags().join("\n"));
       } else {
         const sha = repo.refs.resolveHead();
-        if (!sha) die('fatal: no commits yet');
+        if (!sha) die("fatal: no commits yet");
         repo.refs.createTag(name, sha);
         out(`Created tag '${name}'`);
       }
@@ -317,18 +316,18 @@ try {
     }
 
     // ── config ────────────────────────────────────────────────────────────
-    case 'config': {
+    case "config": {
       // lgit config user.name "John"
       // lgit config --get user.name
-      const repo   = needRepo();
-      const getMode = flag('--get');
+      const repo = needRepo();
+      const getMode = flag("--get");
       const keyArg = positionals(1)[0];
-      if (!keyArg) die('config: key required');
+      if (!keyArg) die("config: key required");
 
-      const dotIdx  = keyArg.indexOf('.');
-      if (dotIdx === -1) die('config: key must be in <section>.<name> form');
+      const dotIdx = keyArg.indexOf(".");
+      if (dotIdx === -1) die("config: key must be in <section>.<name> form");
       const section = keyArg.slice(0, dotIdx);
-      const key     = keyArg.slice(dotIdx + 1);
+      const key = keyArg.slice(dotIdx + 1);
 
       if (getMode) {
         const val = repo.config.get(section, key);
@@ -336,7 +335,7 @@ try {
         out(val);
       } else {
         const val = positionals(1)[1];
-        if (val === undefined) die('config: value required');
+        if (val === undefined) die("config: value required");
         repo.config.set(section, key, val);
         repo.config.save();
       }
@@ -344,27 +343,32 @@ try {
     }
 
     // ── remote ────────────────────────────────────────────────────────────
-    case 'remote': {
-      const repo    = needRepo();
-      const sub     = args[1];
-      const mgr     = new RemoteManager(repo);
+    case "remote": {
+      const repo = needRepo();
+      const sub = args[1];
+      const mgr = new RemoteManager(repo);
 
-      if (!sub || sub === 'show' || sub === '-v') {
+      if (!sub || sub === "show" || sub === "-v") {
         const remotes = mgr.list();
-        if (remotes.length === 0) { out('(no remotes configured)'); break; }
-        for (const r of remotes) out(sub === '-v' ? `${r.name}\t${r.url}` : r.name);
+        if (remotes.length === 0) {
+          out("(no remotes configured)");
+          break;
+        }
+        for (const r of remotes)
+          out(sub === "-v" ? `${r.name}\t${r.url}` : r.name);
         break;
       }
-      if (sub === 'add') {
-        const name = args[2]; const url = args[3];
-        if (!name || !url) die('remote add: <name> <url> required');
+      if (sub === "add") {
+        const name = args[2];
+        const url = args[3];
+        if (!name || !url) die("remote add: <name> <url> required");
         mgr.add(name, url);
         out(`Added remote '${name}' → ${url}`);
         break;
       }
-      if (sub === 'remove' || sub === 'rm') {
+      if (sub === "remove" || sub === "rm") {
         const name = args[2];
-        if (!name) die('remote remove: <name> required');
+        if (!name) die("remote remove: <name> required");
         mgr.remove(name);
         out(`Removed remote '${name}'`);
         break;
@@ -373,103 +377,112 @@ try {
     }
 
     // ── fetch ─────────────────────────────────────────────────────────────
-    case 'fetch': {
-      const repo    = needRepo();
-      const remote  = positionals(1)[0];
-      const verbose = flag('-v') || flag('--verbose');
-      out('Fetching...');
+    case "fetch": {
+      const repo = needRepo();
+      const remote = positionals(1)[0];
+      const verbose = flag("-v") || flag("--verbose");
+      out("Fetching...");
       gitFetch(repo, {
         remote,
         verbose,
-        onProgress: (m) => process.stderr.write(m + '\n'),
-      }).then(out).catch((e: Error) => die(e.message));
+        onProgress: (m) => process.stderr.write(m + "\n"),
+      })
+        .then(out)
+        .catch((e: Error) => die(e.message));
       break;
     }
 
     // ── push ──────────────────────────────────────────────────────────────
-    case 'push': {
-      const repo    = needRepo();
-      const remote  = positionals(1)[0];
+    case "push": {
+      const repo = needRepo();
+      const remote = positionals(1)[0];
       const refspec = positionals(1)[1];
-      const force   = flag('-f') || flag('--force');
-      out('Pushing...');
+      const force = flag("-f") || flag("--force");
+      out("Pushing...");
       gitPush(repo, {
         remote,
         refspec,
         force,
-        onProgress: (m) => process.stderr.write(m + '\n'),
-      }).then(out).catch((e: Error) => die(e.message));
+        onProgress: (m) => process.stderr.write(m + "\n"),
+      })
+        .then(out)
+        .catch((e: Error) => die(e.message));
       break;
     }
 
     // ── pull ──────────────────────────────────────────────────────────────
-    case 'pull': {
-      const repo   = needRepo();
+    case "pull": {
+      const repo = needRepo();
       const remote = positionals(1)[0];
       const branch = positionals(1)[1];
-      out('Pulling...');
+      out("Pulling...");
       gitPull(repo, {
         remote,
         branch,
-        onProgress: (m) => process.stderr.write(m + '\n'),
-      }).then(out).catch((e: Error) => die(e.message));
+        onProgress: (m) => process.stderr.write(m + "\n"),
+      })
+        .then(out)
+        .catch((e: Error) => die(e.message));
       break;
     }
 
     // ── clone ─────────────────────────────────────────────────────────────
-    case 'clone': {
+    case "clone": {
       const url = positionals(1)[0];
-      if (!url) die('clone: URL required');
+      if (!url) die("clone: URL required");
       const directory = positionals(1)[1];
       gitClone({
         url,
         directory,
-        onProgress: (m) => process.stderr.write(m + '\n'),
-      }).then(out).catch((e: Error) => die(e.message));
+        onProgress: (m) => process.stderr.write(m + "\n"),
+      })
+        .then(out)
+        .catch((e: Error) => die(e.message));
       break;
     }
 
     // ── show ──────────────────────────────────────────────────────────────
-    case 'show': {
+    case "show": {
       const repo = needRepo();
-      const stat = flag('--stat');
-      const ref  = positionals(1)[0];
+      const stat = flag("--stat");
+      const ref = positionals(1)[0];
       out(gitShow(repo, { ref, stat }));
       break;
     }
 
     // ── merge ─────────────────────────────────────────────────────────────
-    case 'merge': {
-      const repo   = needRepo();
-      const noFf   = flag('--no-ff');
-      const msg    = optArg('-m');
+    case "merge": {
+      const repo = needRepo();
+      const noFf = flag("--no-ff");
+      const msg = optArg("-m");
       const branch = positionals(1)[0];
-      if (!branch) die('merge: branch name required');
+      if (!branch) die("merge: branch name required");
       out(gitMerge(repo, { branch, message: msg, noFf }));
       break;
     }
 
     // ── stash ─────────────────────────────────────────────────────────────
-    case 'stash': {
+    case "stash": {
       const repo = needRepo();
-      const sub  = args[1];
+      const sub = args[1];
       // 'push' is the default; distinguish from a branch-name positional
-      const knownSubs = ['push', 'pop', 'list', 'drop', 'show'];
+      const knownSubs = ["push", "pop", "list", "drop", "show"];
       const isSub = sub && knownSubs.includes(sub);
-      const subCmd = isSub ? sub : (sub === undefined ? 'push' : undefined);
+      const subCmd = isSub ? sub : sub === undefined ? "push" : undefined;
       if (subCmd === undefined) die(`stash: unknown subcommand '${sub}'`);
-      const msg  = optArg('-m');
-      const ref  = isSub && (sub === 'drop' || sub === 'show')
-        ? positionals(2)[0]
-        : undefined;
+      const msg = optArg("-m");
+      const ref =
+        isSub && (sub === "drop" || sub === "show")
+          ? positionals(2)[0]
+          : undefined;
       out(gitStash(repo, { sub: subCmd, message: msg, ref }));
       break;
     }
 
     // ── help / default ────────────────────────────────────────────────────
     case undefined:
-    case '--help':
-    case 'help': {
+    case "--help":
+    case "help": {
       out(HELP);
       break;
     }
@@ -480,4 +493,3 @@ try {
 } catch (err: any) {
   die(err.message ?? String(err));
 }
-
