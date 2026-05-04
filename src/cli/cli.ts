@@ -485,8 +485,6 @@ try {
       break;
     }
 
-    // ── help / default ────────────────────────────────────────────────────
-    case undefined:
     // ── upload-pack (server-side: serve fetch/clone) ──────────────────────
     case "upload-pack": {
       const repoPath = positionals(1)[0];
@@ -494,7 +492,7 @@ try {
       if (flag("--advertise-refs")) {
         uploadPackAdvertise(repoPath);
       } else if (flag("--stateless-rpc")) {
-        uploadPackStateless(repoPath);
+        uploadPackStateless(repoPath).catch((e: Error) => die(e.message));
       } else {
         die("upload-pack: expected --stateless-rpc");
       }
@@ -508,7 +506,7 @@ try {
       if (flag("--advertise-refs")) {
         receivePackAdvertise(repoPath);
       } else if (flag("--stateless-rpc")) {
-        receivePackStateless(repoPath);
+        receivePackStateless(repoPath).catch((e: Error) => die(e.message));
       } else {
         die("receive-pack: expected --stateless-rpc");
       }

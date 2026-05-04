@@ -21,6 +21,9 @@ import {
   RefUpdate,
   collectObjectsForPush,
 } from "../core/remote/receive-pack";
+import { ObjectStore } from "../core/objects/store";
+import { CommitObjectParser } from "../core/objects/commit";
+import { TreeObject } from "../core/objects/tree";
 
 export interface PushOptions {
   remote?: string;
@@ -45,7 +48,8 @@ export async function push(
   // 1. Discover remote refs
   const advert = await discoverReceiveRefs(url);
   const remoteRefMap = new Map(advert.refs.map((r) => [r.name, r.sha]));
-  const remoteHas = new Set(advert.refs.map((r) => r.sha));
+  const remoteTips = advert.refs.map((r) => r.sha).filter((sha) => repo.store.exists(sha));
+  const remoteHas = collectReachableLocally(repo.store, remoteTips);
 
   // 2. Determine which local branches to push
   const refspecs = resolveRefspecs(repo, opts.refspec);
@@ -163,6 +167,25 @@ function defaultRemote(repo: Repository): string | null {
   const list = mgr.listNames();
   if (list.includes("origin")) return "origin";
   return list[0] ?? null;
+}
+
+function collectReachableLocally(store: ObjectStore, tips: string[]): Set<string> {
+  const visited = new Set<string>();
+  const queue = [...tips];
+  while (queue.length > 0) {
+    const sha = queue.shift()!;
+    if (visited.has(sha) || !store.exists(sha)) continue;
+    visited.add(sha);
+    const { type, content } = store.read(sha);
+    if (type === "commit") {
+      const c = CommitObjectParser.deserialize(content);
+      queue.push(c.tree, ...c.parents);
+    } else if (type === "tree") {
+      const t = TreeObject.deserialize(content);
+      for (const e of t.entries) queue.push(e.hash);
+    }
+  }
+  return visited;
 }
 
 async function isFastForward(
